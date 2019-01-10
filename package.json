@@ -1,0 +1,23 @@
+{
+  "name": "pathmap",
+  "version": "1.0.0",
+  "description": "small library to map a path to its value",
+  "main": "dist/index.js",
+  "dependencies": {},
+  "devDependencies": {
+    "@types/jest": "^23.3.10",
+    "jest": "^23.6.0",
+    "ts-jest": "^23.10.5",
+    "typescript": "^3.2.2"
+  },
+  "scripts": {
+    "test": "jest"
+  },
+  "keywords": [
+    "object",
+    "path",
+    "map"
+  ],
+  "author": "olivier guerin",
+  "license": "ISC"
+}
