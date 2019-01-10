@@ -11,7 +11,8 @@
     "typescript": "^3.2.2"
   },
   "scripts": {
-    "test": "jest"
+    "test": "jest",
+    "build": "tsc"
   },
   "keywords": [
     "object",
