@@ -1,96 +1,113 @@
-import PathBuilder, {Path} from './pathBuilder';
+export type Path = (number | string)[];
 
-function isPlainObject(value: any) {
-    return typeof value === "object" && value !== null;
+// 01, +1, -1, 1.0, etc... : are described as invalid index to avoid loosing information during parseInt
+const REGEX_IDX = /^(0|[1-9]\d?)$/;
+const REGEX_TRIM = /^\s*$/;
+
+function basicExitCondition(char: string | void) {
+    return char !== '.' && char !== '[';
 }
 
-function browseTree(tree: object, path: (number|string)[]) {
-    let value:any = tree;
-    for(let i = 0, l = path.length; i < l; i++) {
-        const nextKey = path[i];
-        value = value[nextKey];
-        if (i < l - 1 && !isPlainObject(value)) { // stop if you can't go deeper
-            return [false, undefined];
-        }
-    }
-    return [true, value];
+function bracketExitCondition(char: string | void) {
+    return char !== ']';
 }
 
-const memoizer = new Map<string, Path>();
-const pathBuilderSingleton = new PathBuilder();
-function extractPath(path: string | Path): Path {
-    if (typeof path === 'string') {
-        const memoizeredValue = memoizer.get(path);
-        if (memoizeredValue) {
-            return memoizeredValue;
-        }
-        
-        const pathAsArray = pathBuilderSingleton.compute(path);
-        memoizer.set(path, pathAsArray);
-        return pathAsArray;
+class PathBuilder {
+    _path: string;
+    _char: string | void;
+    _index: number;
+    _result: Path;
+
+    constructor(path: string) {
+        this._path = path;
+        this._index = 0;
+        this._char = path[0];
+        this._result = [];
     }
 
-    return Array.isArray(path) ? path : null; // do not memoize array to avoid possible memory leak
-}
-
-class PathMap {
-    _values: object;
-
-    constructor(obj:object = {}) {
-        this._values = obj;
+    nextChar() {
+        this._index += 1;
+        this._char = this._path[this._index];
+        return this._char;
     }
 
-    get values() {
-        return this._values;
-    }
-
-    set values (values: object) {
-        this._values = values;
-    }
-
-    getValue(path: string): any {
-        const breadcrumbs = extractPath(path);
-        return browseTree(this.values, breadcrumbs)[1];
-    }
-
-    setValue(path: string | (number|string)[], nextValue: any) {
-        const breadcrumbs = extractPath(path);
-        const [defined, previousValue] = browseTree(this.values, breadcrumbs);
-
-        if (!defined || previousValue !== nextValue) {
-            this.values = {...this.values}; // Immutable
-
-            for(let i = 0, l = breadcrumbs.length, position = this.values; i < l; i++) {
-                const crumb = breadcrumbs[i];
-                if (i < l - 1) {
-                    const nextPosition = position[crumb];
-                    // TODO check if number to add/update an array
-                    const newObject = isPlainObject(nextPosition) ? {...nextPosition} : {};
-        
-                    position[crumb] = newObject;
-                    position = newObject; // go deeper
-                } else { // last element of the path
-                    position[crumb] = nextValue;
-                }
+    parse(): Path {
+        while (this._char) {
+            if (this._char === '[') {
+                this.extractBracketCrumb();
+            } else if (this._char === '.') {
+                this.nextChar();
+            } else {
+                this.extractBasicCrumb();
             }
         }
+
+        return this._result;
     }
 
-    deleteValue(path: string, indexes?: number|number[], lastIndex?: number) { // splice on array ???
-        const breadcrumbs = extractPath(path);
-        const lastCrumb = breadcrumbs.pop();
-        const [defined, value] = browseTree(this.values, breadcrumbs);
+    pushCrumb(crumb: string, quoted: boolean){
+        if (crumb === '') return;
 
-        if (defined && typeof value === 'object' && value.hasOwnProperty(lastCrumb)) {
-            const previousValue = value[lastCrumb];
-            let nextValue = [...previousValue];
-            if (Array.isArray(previousValue)) {
-                if (typeof indexes === 'number' && typeof lastIndex === 'number') {
-                    nextValue.splice(indexes, lastIndex);
-                } 
+        const key = !quoted && REGEX_IDX.test(crumb) ? parseInt(crumb) : crumb;
+        this._result.push(key);
+    }
+
+    extractCrumb(exitCondition: (c: string | void) => boolean) {
+        let crumb = '';
+        while(exitCondition(this._char)) {
+            if (this._char === '\\') { // ESCAPE
+                this.nextChar();
             }
+            if(!this._char) {
+                break;
+            }
+            crumb += this._char;
+            this.nextChar();
         }
+        return crumb;
     }
+
+    extractBasicCrumb() {
+        const crumb = this.extractCrumb(basicExitCondition);
+        this.pushCrumb(crumb.trim(), false);
+    }
+
+    extractBracketCrumb() {
+        let crumb = '';
+
+        this.nextChar(); // skip '['
+        while (this._char && REGEX_TRIM.test(this._char)) { // manual trim
+            this.nextChar();
+        }
+
+        let quote: string | null= null;
+        if (this._char === '"' || this._char === '\'') {
+            quote = this._char;
+            this.nextChar();
+            crumb = this.extractCrumb((value: string | void) => value !== quote);
+            if (this._char === quote) {
+                this.nextChar();
+            }
+        } 
+        
+        const nextCrumb = this.extractCrumb(bracketExitCondition); // check for values between quote and closing bracket
+        if (!REGEX_TRIM.test(nextCrumb)) {
+            const value = quote ? quote + crumb + quote + nextCrumb : nextCrumb;
+            crumb = value.trim();
+        }
+            
+        this.nextChar();  // skip ']'
+        this.pushCrumb(crumb, !!quote);
+    } 
 }
 
-export default PathMap;
+const stringToPath = {
+    parse: function parse(value: string) {
+        if (typeof value !== 'string') {
+            throw new Error('stringToPath.parse requires a string');
+        }
+        const pathBuilder = new PathBuilder(value);
+        return pathBuilder.parse();
+    }
+}
+export default stringToPath;

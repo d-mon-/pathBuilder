@@ -1,14 +1,16 @@
 {
     "compilerOptions": {
-        "target": "es5",
+        "target": "es5", // ie11+
         "module": "es2015",
-        "lib": ["es6", "dom"],
+        "lib": ["es5", "dom", "es2015.collection"],
         "removeComments": true,
         "sourceMap": true,
         "sourceRoot": "./src/",
         "rootDir": "./src/",
         "declaration": true,
         "outDir": "dist",
+        "alwaysStrict": true,
+        "strict": true,
     },
     "include": [
         "src/**/*"

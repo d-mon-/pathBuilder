@@ -12,12 +12,13 @@
   },
   "scripts": {
     "test": "jest",
-    "build": "tsc"
+    "build": "rm -rf dist/ && tsc"
   },
   "keywords": [
-    "object",
+    "string",
     "path",
-    "map"
+    "parser",
+    "json"
   ],
   "author": "olivier guerin",
   "license": "ISC"
